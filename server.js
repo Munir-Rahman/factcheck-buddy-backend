@@ -1,8 +1,8 @@
+import nodemailer from "nodemailer";
 import express from "express";
 import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
-import nodemailer from "nodemailer"; // make sure this is imported at top
 import fs from "fs";
 import path from "path";
 
