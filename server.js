@@ -1,68 +1,49 @@
-import nodemailer from "nodemailer";
 import express from "express";
 import cors from "cors";
+import nodemailer from "nodemailer";
 import axios from "axios";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-app.use(express.json());
-dotenv.config();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// API: Check claim (stub, no dataset)
-app.post("/api/check-claim", (req, res) => {
-  const { claim } = req.body;
-
-  if (!claim || claim.trim() === "") {
-    return res.status(400).json({ error: "Claim text is required" });
-  }
-
-  // Always return unverified because no dataset is used
-  return res.json({
-    verdict: "unverified",
-    description: "Claim not verified.",
-    sources: []
-  });
-});
-
-
-// 🔑 NYT API Key
+// ======================
+// NYT NEWS ROUTE
+// ======================
 const NYT_API_KEY = process.env.NYT_API_KEY;
 
-// 📰 Route: /news/:section
 app.get("/news/:section", async (req, res) => {
   try {
-    const section = req.params.section || "home"; // Default section = home
+    const section = req.params.section || "home";
     const url = `https://api.nytimes.com/svc/topstories/v2/${section}.json?api-key=${NYT_API_KEY}`;
 
     const response = await axios.get(url);
 
-    // Format articles (only first 20)
     const articles = response.data.results.slice(0, 20).map((item) => ({
       title: item.title,
       publishedAt: item.published_date,
       description: item.abstract,
       url: item.url,
       source: "New York Times",
-      image:
-        item.multimedia && item.multimedia.length > 0
-          ? item.multimedia[0].url
-          : null,
+      image: item.multimedia && item.multimedia.length > 0 ? item.multimedia[0].url : null,
     }));
 
     res.json(articles);
-  } catch (error) {
-    console.error("❌ Error fetching news:", error.message);
+  } catch (err) {
+    console.error("❌ Error fetching news:", err.message);
     res.status(500).json({ error: "Failed to fetch news" });
   }
 });
 
-// ================== CONTACT FORM ROUTE ==================
-
+// ======================
+// CONTACT FORM ROUTE
+// ======================
 app.post("/send-contact", async (req, res) => {
   const { name, email, message } = req.body;
 
@@ -75,7 +56,7 @@ app.post("/send-contact", async (req, res) => {
       service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // App Password, no spaces
+        pass: process.env.EMAIL_PASS, // Gmail App Password
       },
     });
 
@@ -86,15 +67,13 @@ app.post("/send-contact", async (req, res) => {
       text: `Name: ${name}\nEmail: ${email}\nMessage:\n${message}`,
     };
 
-    // 🔹 Send email with callback to catch detailed error
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
-        console.error("❌ Nodemailer Error Details:", err); // 👈 This will show exact reason
+        console.error("❌ Nodemailer Error Details:", err);
         return res.json({ success: false, error: err.message });
-      } else {
-        console.log("✅ Email sent:", info.response);
-        return res.json({ success: true });
       }
+      console.log("✅ Contact Email sent:", info.response);
+      return res.json({ success: true });
     });
   } catch (err) {
     console.error("❌ Server Exception:", err);
@@ -102,7 +81,9 @@ app.post("/send-contact", async (req, res) => {
   }
 });
 
-// ================== FEEDBACK FORM ==================
+// ======================
+// FEEDBACK FORM ROUTE
+// ======================
 app.post("/send-feedback", async (req, res) => {
   const { rating, feedbackText, email } = req.body;
 
@@ -115,7 +96,7 @@ app.post("/send-feedback", async (req, res) => {
       service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // App Password
+        pass: process.env.EMAIL_PASS,
       },
     });
 
@@ -130,10 +111,9 @@ app.post("/send-feedback", async (req, res) => {
       if (err) {
         console.error("❌ Nodemailer Error:", err);
         return res.json({ success: false, error: err.message });
-      } else {
-        console.log("✅ Feedback Email sent:", info.response);
-        return res.json({ success: true });
       }
+      console.log("✅ Feedback Email sent:", info.response);
+      return res.json({ success: true });
     });
   } catch (err) {
     console.error("❌ Server Exception:", err);
@@ -141,13 +121,33 @@ app.post("/send-feedback", async (req, res) => {
   }
 });
 
+// ======================
+// CLAIM CHECK STUB
+// ======================
+app.post("/api/check-claim", (req, res) => {
+  const { claim } = req.body;
 
+  if (!claim || claim.trim() === "") {
+    return res.status(400).json({ error: "Claim text is required" });
+  }
 
-// Root check
+  return res.json({
+    verdict: "unverified",
+    description: "Claim not verified.",
+    sources: [],
+  });
+});
+
+// ======================
+// ROOT CHECK
+// ======================
 app.get("/", (req, res) => {
   res.send("✅ NYT FactCheck-Buddy Backend is running...");
 });
 
+// ======================
+// START SERVER
+// ======================
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
